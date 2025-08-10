@@ -138,20 +138,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
 
       case 'help': {
-        const lines = [
-          '`/ping` – latency',
-          '`/say text:` – pošli zprávu',
-          '`/purge count:` – smaž N zpráv',
-          '`/play url:` – pusť YouTube audio',
-          '`/stop` – zastav a odpoj',
-          '`/announce-test` – test oznámení'
-        ];
-        await interaction.reply({
-          content: `Dostupné příkazy:\n${lines.join('\n')}`,
-          ephemeral: true
-        });
-        break;
-      }
+  const lines = [
+    '`/ping` – latency',
+    '`/say text:` – pošli zprávu',
+    '`/purge count:` – smaž N zpráv',
+    '`/play url:` – pusť YouTube audio',
+    '`/stop` – zastav a odpoj',
+    '`/announce-test` – test oznámení'
+  ];
+  return interaction.reply({
+    content: `Dostupné příkazy:\n${lines.join('\n')}`,
+    ephemeral: true
+  });
+}
+
 
       case 'play': {
         case 'play': {
