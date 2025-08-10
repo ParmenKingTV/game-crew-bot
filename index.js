@@ -1,3 +1,4 @@
+// index.js (čistá verze)
 require('dotenv').config();
 const http = require('http');
 const {
@@ -8,7 +9,7 @@ const {
   REST,
   Routes,
   SlashCommandBuilder,
-  PermissionFlagsBits
+  PermissionFlagsBits,
 } = require('discord.js');
 
 const {
@@ -17,20 +18,24 @@ const {
   createAudioResource,
   AudioPlayerStatus,
   getVoiceConnection,
-  demuxProbe
 } = require('@discordjs/voice');
 
 const play = require('play-dl');
 const fetch = require('node-fetch');
+
+// pokud přidáš YT_COOKIE do env, play-dl ji použije
+if (process.env.YT_COOKIE) {
+  play.setToken({ youtube: { cookie: process.env.YT_COOKIE } });
+}
 
 // --- Client ---
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildVoiceStates
+    GatewayIntentBits.GuildVoiceStates,
   ],
-  partials: [Partials.GuildMember]
+  partials: [Partials.GuildMember],
 });
 
 // --- Moderation guard (role-only) ---
@@ -49,12 +54,16 @@ const commands = [
   new SlashCommandBuilder()
     .setName('say')
     .setDescription('Make the bot say something')
-    .addStringOption(opt => opt.setName('text').setDescription('What should I say?').setRequired(true)),
+    .addStringOption((opt) =>
+      opt.setName('text').setDescription('What should I say?').setRequired(true),
+    ),
 
   new SlashCommandBuilder()
     .setName('purge')
     .setDescription('Delete N recent messages (2–100)')
-    .addIntegerOption(opt => opt.setName('count').setDescription('How many? (2–100)').setRequired(true))
+    .addIntegerOption((opt) =>
+      opt.setName('count').setDescription('How many? (2–100)').setRequired(true),
+    )
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
   new SlashCommandBuilder().setName('help').setDescription('Zobrazí dostupné příkazy'),
@@ -62,12 +71,12 @@ const commands = [
   new SlashCommandBuilder()
     .setName('play')
     .setDescription('Pustí audio z YouTube URL ve tvém hlasovém kanálu')
-    .addStringOption(o => o.setName('url').setDescription('YouTube URL').setRequired(true)),
+    .addStringOption((o) => o.setName('url').setDescription('YouTube URL').setRequired(true)),
 
   new SlashCommandBuilder().setName('stop').setDescription('Zastaví přehrávání a odpojí bota z hlasového kanálu'),
 
-  new SlashCommandBuilder().setName('announce-test').setDescription('Pošle testovací oznámení do ANNOUNCE_CHANNEL_ID')
-].map(c => c.toJSON());
+  new SlashCommandBuilder().setName('announce-test').setDescription('Pošle testovací oznámení do ANNOUNCE_CHANNEL_ID'),
+].map((c) => c.toJSON());
 
 async function registerSlashCommands() {
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
@@ -87,9 +96,10 @@ async function registerSlashCommands() {
 
 // --- Audio player ---
 const player = createAudioPlayer();
-player.on('error', e => console.error('Audio error:', e));
+player.on('error', (e) => console.error('Audio error:', e));
 player.on(AudioPlayerStatus.Idle, () => {});
 
+// --- Ready ---
 client.once(Events.ClientReady, async (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
   await registerSlashCommands();
@@ -137,44 +147,45 @@ client.on(Events.InteractionCreate, async (interaction) => {
         break;
       }
 
-case 'help': {
-  const lines = [
-    '`/ping` – latency',
-    '`/say text:` – pošli zprávu',
-    '`/purge count:` – smaž N zpráv',
-    '`/play url:` – pusť YouTube audio',
-    '`/stop` – zastav a odpoj',
-    '`/announce-test` – test oznámení'
-  ];
-  return interaction.reply({
-    content: `Dostupné příkazy:\n${lines.join('\n')}`,
-    ephemeral: true
-  });
-}
-// === správně, jen JEDEN case 'play' ===
-case 'play': {
-  const url = interaction.options.getString('url', true);
-  const voice = interaction.member?.voice?.channel;
-  if (!voice) {
-    return interaction.reply({ content: 'Připoj se do **hlasového** kanálu.', ephemeral: true });
-  }
+      case 'help': {
+        const lines = [
+          '`/ping` – latency',
+          '`/say text:` – pošli zprávu',
+          '`/purge count:` – smaž N zpráv',
+          '`/play url:` – pusť YouTube audio',
+          '`/stop` – zastav a odpoj',
+          '`/announce-test` – test oznámení',
+        ];
+        await interaction.reply({
+          content: `Dostupné příkazy:\n${lines.join('\n')}`,
+          ephemeral: true,
+        });
+        break;
+      }
 
-  await interaction.reply({ content: '🎵 Načítám…', ephemeral: true });
+      case 'play': {
+        const url = interaction.options.getString('url', true);
+        const voice = interaction.member?.voice?.channel;
+        if (!voice) {
+          await interaction.reply({ content: 'Připoj se do **hlasového** kanálu.', ephemeral: true });
+          break;
+        }
 
-  const conn = joinVoiceChannel({
-    channelId: voice.id,
-    guildId: voice.guild.id,
-    adapterCreator: voice.guild.voiceAdapterCreator
-  });
+        await interaction.reply({ content: '🎵 Načítám…', ephemeral: true });
 
-  const stream = await play.stream(url, { quality: 2 }); // audio only
-  const resource = createAudioResource(stream.stream, { inputType: stream.type });
-  conn.subscribe(player);
-  player.play(resource);
+        const conn = joinVoiceChannel({
+          channelId: voice.id,
+          guildId: voice.guild.id,
+          adapterCreator: voice.guild.voiceAdapterCreator,
+        });
 
-  await interaction.followUp({ content: '▶️ Hraju: ' + url, ephemeral: true });
-  break;
-}
+        const stream = await play.stream(url, { quality: 2 }); // audio only
+        const resource = createAudioResource(stream.stream, { inputType: stream.type });
+        conn.subscribe(player);
+        player.play(resource);
+
+        await interaction.followUp({ content: '▶️ Hraju: ' + url, ephemeral: true });
+        break;
       }
 
       case 'stop': {
@@ -187,7 +198,10 @@ case 'play': {
 
       case 'announce-test': {
         const chId = process.env.ANNOUNCE_CHANNEL_ID;
-        const ch = chId && (interaction.guild.channels.cache.get(chId) || await interaction.guild.channels.fetch(chId).catch(() => null));
+        const ch =
+          chId &&
+          (interaction.guild.channels.cache.get(chId) ||
+            (await interaction.guild.channels.fetch(chId).catch(() => null)));
         if (!ch || !ch.isTextBased()) {
           await interaction.reply({ content: 'ANNOUNCE_CHANNEL_ID není nastaven nebo kanál neexistuje.', ephemeral: true });
           break;
@@ -209,17 +223,18 @@ case 'play': {
   }
 });
 
-
 // --- Welcome messages ---
 client.on(Events.GuildMemberAdd, async (member) => {
   const channelId = process.env.WELCOME_CHANNEL_ID;
   if (!channelId) return; // feature disabled
-  const channel = member.guild.channels.cache.get(channelId) || await member.guild.channels.fetch(channelId).catch(() => null);
+  const channel =
+    member.guild.channels.cache.get(channelId) ||
+    (await member.guild.channels.fetch(channelId).catch(() => null));
   if (!channel || !channel.isTextBased()) return;
   channel.send(`👋 Vítej na serveru, ${member}!`);
 });
 
-// --- Lightweight HTTP keep‑alive server (for free hosters) ---
+// --- Lightweight HTTP keep-alive server (for free hosters) ---
 const PORT = process.env.PORT || 3000;
 const server = http.createServer((req, res) => {
   if (req.url === '/health') {
@@ -248,39 +263,5 @@ async function startYouTubeWatcher(client) {
       if (!match) return;
       const videoId = match[1];
       if (lastVideoId && videoId !== lastVideoId) {
-        const ch = await client.channels.fetch(announceId).catch(()=>null);
-        if (ch?.isTextBased()) await ch.send(`📺 **Nové video!** https://youtu.be/${videoId}`);
-      }
-      lastVideoId = videoId;
-    } catch (e) { /* ignore */ }
-  };
-  check();
-  setInterval(check, 5 * 60 * 1000);
-}
-
-let lastKickLive = false;
-async function startKickWatcher(client) {
-  const username = process.env.KICK_USERNAME;
-  const announceId = process.env.ANNOUNCE_CHANNEL_ID;
-  if (!username || !announceId) return;
-  const api = `https://kick.com/api/v2/channels/${username}`; // může se časem měnit
-
-  const check = async () => {
-    try {
-      const res = await fetch(api);
-      if (!res.ok) return;
-      const data = await res.json();
-      const isLive = Boolean(data?.livestream);
-      if (isLive && !lastKickLive) {
-        const ch = await client.channels.fetch(announceId).catch(()=>null);
-        if (ch?.isTextBased()) await ch.send(`🟢 **Live na Kicku!** https://kick.com/${username}`);
-      }
-      lastKickLive = isLive;
-    } catch (e) { /* ignore */ }
-  };
-  check();
-  setInterval(check, 3 * 60 * 1000);
-}
-
-// --- Start ---
-client.login(process.env.TOKEN);
+        const ch = await client.channels.fetch(announceId).catch(() => null);
+        if (ch?.isTextBased()) await ch.send(`📺
