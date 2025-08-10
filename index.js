@@ -146,17 +146,18 @@ case 'help': {
     '`/stop` – zastav a odpoj',
     '`/announce-test` – test oznámení'
   ];
-  await interaction.reply({
+  return interaction.reply({
     content: `Dostupné příkazy:\n${lines.join('\n')}`,
     ephemeral: true
   });
-  break;
 }
-      case 'play': {
-        case 'play': {
+// === správně, jen JEDEN case 'play' ===
+case 'play': {
   const url = interaction.options.getString('url', true);
   const voice = interaction.member?.voice?.channel;
-  if (!voice) return interaction.reply({ content: 'Připoj se do **hlasového** kanálu.', ephemeral: true });
+  if (!voice) {
+    return interaction.reply({ content: 'Připoj se do **hlasového** kanálu.', ephemeral: true });
+  }
 
   await interaction.reply({ content: '🎵 Načítám…', ephemeral: true });
 
@@ -174,7 +175,6 @@ case 'help': {
   await interaction.followUp({ content: '▶️ Hraju: ' + url, ephemeral: true });
   break;
 }
-
       }
 
       case 'stop': {
