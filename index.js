@@ -146,12 +146,12 @@ case 'help': {
     '`/stop` – zastav a odpoj',
     '`/announce-test` – test oznámení'
   ];
-  return interaction.reply({
+  await interaction.reply({
     content: `Dostupné příkazy:\n${lines.join('\n')}`,
     ephemeral: true
   });
+  break;
 }
-
       case 'play': {
         case 'play': {
   const url = interaction.options.getString('url', true);
