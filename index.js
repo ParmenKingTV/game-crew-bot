@@ -264,4 +264,42 @@ async function startYouTubeWatcher(client) {
       const videoId = match[1];
       if (lastVideoId && videoId !== lastVideoId) {
         const ch = await client.channels.fetch(announceId).catch(() => null);
-        if (ch?.isTextBased()) await ch.send(`📺
+        if (ch?.isTextBased()) await ch.send(`📺 **Nové video!** https://youtu.be/${videoId}`);
+      }
+      lastVideoId = videoId;
+    } catch (e) {
+      /* ignore */
+    }
+  };
+  check();
+  setInterval(check, 5 * 60 * 1000);
+}
+
+let lastKickLive = false;
+async function startKickWatcher(client) {
+  const username = process.env.KICK_USERNAME;
+  const announceId = process.env.ANNOUNCE_CHANNEL_ID;
+  if (!username || !announceId) return;
+  const api = `https://kick.com/api/v2/channels/${username}`; // může se časem měnit
+
+  const check = async () => {
+    try {
+      const res = await fetch(api);
+      if (!res.ok) return;
+      const data = await res.json();
+      const isLive = Boolean(data?.livestream);
+      if (isLive && !lastKickLive) {
+        const ch = await client.channels.fetch(announceId).catch(() => null);
+        if (ch?.isTextBased()) await ch.send(`🟢 **Live na Kicku!** https://kick.com/${username}`);
+      }
+      lastKickLive = isLive;
+    } catch (e) {
+      /* ignore */
+    }
+  };
+  check();
+  setInterval(check, 3 * 60 * 1000);
+}
+
+// --- Start ---
+client.login(process.env.TOKEN);
