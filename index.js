@@ -24,9 +24,16 @@ const play = require('play-dl');
 const fetch = require('node-fetch');
 
 // pokud přidáš YT_COOKIE do env, play-dl ji použije
-if (process.env.YT_COOKIE) {
-  play.setToken({ youtube: { cookie: process.env.YT_COOKIE } });
+// play-dl tokeny (cookie + user-agent z env)
+if (process.env.YT_COOKIE || process.env.USER_AGENT) {
+  play.setToken({
+    youtube: {
+      cookie: process.env.YT_COOKIE,     // může zůstat undefined
+      userAgent: process.env.USER_AGENT  // může zůstat undefined
+    }
+  });
 }
+
 
 // --- Client ---
 const client = new Client({
@@ -164,30 +171,48 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
 
       case 'play': {
-        const url = interaction.options.getString('url', true);
-        const voice = interaction.member?.voice?.channel;
-        if (!voice) {
-          await interaction.reply({ content: 'Připoj se do **hlasového** kanálu.', ephemeral: true });
-          break;
-        }
+  const input = interaction.options.getString('url', true);
+  const voice = interaction.member?.voice?.channel;
+  if (!voice) {
+    await interaction.reply({ content: 'Připoj se do **hlasového** kanálu.', ephemeral: true });
+    break;
+  }
 
-        await interaction.reply({ content: '🎵 Načítám…', ephemeral: true });
+  // 1. jedno potvrzení a pak už jen editujeme
+  await interaction.deferReply({ ephemeral: true });
 
-        const conn = joinVoiceChannel({
-          channelId: voice.id,
-          guildId: voice.guild.id,
-          adapterCreator: voice.guild.voiceAdapterCreator,
-        });
+  try {
+    // 2. ověříme, zda je to YT video; když ne, zkusíme vyhledat
+    let url = input;
+    const valid = await play.validate(url);
+    if (valid !== 'yt_video') {
+      const results = await play.search(input, { limit: 1 });
+      if (!results.length) throw new Error('Nic jsem nenašel.');
+      url = results[0].url;
+    }
 
-        const stream = await play.stream(url, { quality: 2 }); // audio only
-        const resource = createAudioResource(stream.stream, { inputType: stream.type });
-        conn.subscribe(player);
-        player.play(resource);
+    // 3. připojení do hlasáku
+    const conn = joinVoiceChannel({
+      channelId: voice.id,
+      guildId: voice.guild.id,
+      adapterCreator: voice.guild.voiceAdapterCreator
+    });
 
-        await interaction.followUp({ content: '▶️ Hraju: ' + url, ephemeral: true });
-        break;
-      }
+    // 4. stream přes play-dl (audio only)
+    const { stream, type } = await play.stream(url, { quality: 2 });
+    const resource = createAudioResource(stream, { inputType: type });
+    conn.subscribe(player);
+    player.play(resource);
 
+    await interaction.editReply(`▶️ Hraju: ${url}`);
+  } catch (err) {
+    console.error('play error:', err);
+    await interaction.editReply(
+      '❌ Nepodařilo se načíst audio. Zkus jiné video **nebo** nastav `YT_COOKIE` a případně `USER_AGENT` v Environment na Renderu.'
+    );
+  }
+  break;
+}
       case 'stop': {
         player.stop();
         const conn = getVoiceConnection(interaction.guild.id);
