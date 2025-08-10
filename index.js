@@ -137,7 +137,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         break;
       }
 
-      case 'help': {
+case 'help': {
   const lines = [
     '`/ping` – latency',
     '`/say text:` – pošli zprávu',
@@ -151,7 +151,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     ephemeral: true
   });
 }
-
 
       case 'play': {
         case 'play': {
