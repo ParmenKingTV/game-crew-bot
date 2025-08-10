@@ -20,7 +20,7 @@ const {
   demuxProbe
 } = require('@discordjs/voice');
 
-const ytdl = require('@distube/ytdl-core');
+const play = require('play-dl');
 const fetch = require('node-fetch');
 
 // --- Client ---
@@ -154,33 +154,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
 
       case 'play': {
-        const url = interaction.options.getString('url', true);
-        if (!ytdl.validateURL(url)) {
-          await interaction.reply({ content: 'Dej prosím platné **YouTube URL**.', ephemeral: true });
-          break;
-        }
-        const voice = interaction.member?.voice?.channel;
-        if (!voice) {
-          await interaction.reply({ content: 'Připoj se nejdřív do **hlasového kanálu**.', ephemeral: true });
-          break;
-        }
+        case 'play': {
+  const url = interaction.options.getString('url', true);
+  const voice = interaction.member?.voice?.channel;
+  if (!voice) return interaction.reply({ content: 'Připoj se do **hlasového** kanálu.', ephemeral: true });
 
-        await interaction.reply({ content: '🎵 Připravuju přehrávání…', ephemeral: true });
+  await interaction.reply({ content: '🎵 Načítám…', ephemeral: true });
 
-        const conn = joinVoiceChannel({
-          channelId: voice.id,
-          guildId: voice.guild.id,
-          adapterCreator: voice.guild.voiceAdapterCreator
-        });
+  const conn = joinVoiceChannel({
+    channelId: voice.id,
+    guildId: voice.guild.id,
+    adapterCreator: voice.guild.voiceAdapterCreator
+  });
 
-        const stream = ytdl(url, { filter: 'audioonly', highWaterMark: 1 << 25, dlChunkSize: 0 });
-        const { stream: probed, type } = await demuxProbe(stream);
-        const resource = createAudioResource(probed, { inputType: type });
-        conn.subscribe(player);
-        player.play(resource);
+  const stream = await play.stream(url, { quality: 2 }); // audio only
+  const resource = createAudioResource(stream.stream, { inputType: stream.type });
+  conn.subscribe(player);
+  player.play(resource);
 
-        await interaction.followUp({ content: '▶️ Hraju: ' + url, ephemeral: true });
-        break;
+  await interaction.followUp({ content: '▶️ Hraju: ' + url, ephemeral: true });
+  break;
+}
+
       }
 
       case 'stop': {
